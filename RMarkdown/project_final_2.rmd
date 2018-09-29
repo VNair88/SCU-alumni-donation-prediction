@@ -1,0 +1,274 @@
+---
+title: "Mktg_project"
+author: "Vinit Nair"
+date: "February 8, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+setwd('C:/R projects')
+rm(list=ls())       # Remove anything that might currently be in memory so we can start fresh.
+library(rms)
+library(data.table) # Load the data.table package.
+library(MASS)       # Load the MASS package
+library(readxl)
+library(foreign)
+library(nnet)
+library(reshape2)
+library(lmtest)
+library(sandwich)
+library(plyr)
+library(gridExtra)
+library(Lock5Data)
+library(ggplot2)
+
+reuniondata <- read_excel("Reunion Giving Predictive Modeling Data Sample 041714.xlsx")
+sum(is.na(reuniondata$State))
+
+```
+
+```{r}
+
+##Convert 'unable to Rate' to NAs
+sum(is.na(reuniondata$`WealthEngine Rating`))
+reuniondata$`WealthEngine Rating` <- ifelse(reuniondata$`WealthEngine Rating`=='Z: Unable to Rate',NA,reuniondata$`WealthEngine Rating`)
+sum(is.na(reuniondata$`WealthEngine Rating`))
+
+reuniondata$`WealthEngine Rating` <- factor(reuniondata$`WealthEngine Rating`)
+reuniondata$RYCohort <- factor(reuniondata$RYCohort)
+
+##Create 'FamilyAlum' var
+reuniondata$FamilyAlum <- ifelse(reuniondata$SpouseAlum==1|reuniondata$ChildAlum==1|reuniondata$ParentAlum==1|reuniondata$SiblingAlum==1,1,0)
+##Create 'Gave' var
+reuniondata$Gave <- reuniondata$Gave1999 + reuniondata$Gave2004 + reuniondata$Gave2009 
+
+colnames(reuniondata)[13] <- "WealthEngineRating"
+colnames(reuniondata)[29] <- "NeverGiven"
+colnames(reuniondata)[28] <- "YearsLapsed"
+
+#Create dataset without nulls in wealthengine rating 
+wealthsubset <- subset(reuniondata, !is.na(reuniondata$WealthEngineRating)) 
+#Create dataset with nulls in wealthengine rating
+wealthsubset_n <- subset(reuniondata, is.na(reuniondata$WealthEngineRating)) 
+
+```
+
+```{r}
+
+plot(reuniondata$RYCohort,col="blue",main="No. of alums as per Cohort year")
+plot(wealthsubset$WealthEngineRating,col="red",main="Distribution as per Wealth Engine Rating")
+ggplot(reuniondata, aes(x=RYCohort, y=Gave2009)) + stat_summary(fun.y="mean", geom="bar", colour='red')
+ggplot(wealthsubset, aes(x=WealthEngineRating, y=Gave2009)) + stat_summary(fun.y="mean", geom="bar", fill='blue')
+table(reuniondata$NeverGiven)
+x <- c(4588,2532)
+lbls <- c("Never Given","Given at least once")
+pie(x,lbls, col=rainbow(length(x)))
+
+ggplot(reuniondata, aes(y=Gave2009, x = ChildAlum)) + stat_summary(fun.y="mean", geom="density", fill='brown')
+
+```
+
+```{r}
+
+##Run ordered logistic models that have 'Wealth Engine Rating' as the dependent var
+
+ol <- polr(WealthEngineRating ~ RYCohort + BetweenRY + ActionNote + SportsAlum + UGAlumAwards + OtherUGAct + EverAssigned + BoardMember + GradDegree + TotalReunions + NetEvents + OnePlusEvents + TotalActions + NeverGiven + Gave + FamilyAlum, data = wealthsubset)
+summary(ol)
+ol.coef <- data.frame(coef(summary(ol)))
+ol.coef$pval = round((pnorm(abs(ol.coef$t.value), lower.tail = FALSE) * 2),2)
+ol.coef
+
+keep <- c("RYCohort","BetweenRY","ActionNote","SportsAlum","UGAlumAwards","OtherUGAct","EverAssigned","BoardMember","GradDegree","TotalReunions","NetEvents","OnePlusEvents","TotalActions","NeverGiven","Gave","FamilyAlum")
+
+##Predict missing 'wealth rating' values
+
+wealth_pred = wealthsubset_n[,keep]
+wealth.pred <- predict(ol, wealth_pred)
+head(wealth.pred)
+predictedClass <- predict(ol, wealth_pred, type="class")
+head(predictedClass)
+
+##Assign predicted classes to missing values
+wealthsubset_n$WealthEngineRating <- predictedClass
+
+##Combine wealthsubset and wealthsubset_n 
+reunion_final <- rbind.data.frame(wealthsubset,wealthsubset_n)
+table(reunion_final$WealthEngineRating)
+sum(is.na(reunion_final$WealthEngineRating))
+
+```
+
+```{r}
+
+##Check correlations 
+d = data.frame(reunion_final[,2:3],reunion_final[,6:12],reunion_final[,14:26],reunion_final[,28:29])
+d$RYCohort <- as.numeric(d$RYCohort)
+d$SpouseAlum <- as.numeric(d$SpouseAlum)
+cor(d)
+
+##Run binary logit models with 'Gave2009' as the dependent var
+bl_model1 = glm(Gave2009~RYCohort+SpouseAlum+Gave2004+Gave1999+BetweenRY+ActionNote+SportsAlum+UGAlumAwards+OtherUGAct+WealthEngineRating+EverAssigned+BoardMember+ChildAlum+ParentAlum+SiblingAlum+GradDegree+Attended09+Attended04+Attended99+NetEvents+TotalActions+NeverGiven, data=reunion_final, family="binomial")
+summary(bl_model1)
+bptest(bl_model1)
+coeftest(bl_model1, vcov = vcovHC(bl_model1, "HC1"))
+
+##Model without 'WealthEngineRating'
+bl_model2 = glm(Gave2009~RYCohort+SpouseAlum+Gave2004+Gave1999+BetweenRY+ActionNote+SportsAlum+UGAlumAwards+OtherUGAct+EverAssigned+BoardMember+ChildAlum+ParentAlum+SiblingAlum+GradDegree+Attended09+Attended04+Attended99+NetEvents+TotalActions+NeverGiven, data=reunion_final, family="binomial")
+summary(bl_model2)
+bptest(bl_model2)
+coeftest(bl_model2, vcov = vcovHC(bl_model2, "HC1"))
+logLik(bl_model2)
+
+##Model without 'WealthEngineRating' & with 'FamilyAlum'
+bl_model3 = glm(Gave2009~RYCohort+FamilyAlum+Gave2004+Gave1999+BetweenRY+ActionNote+SportsAlum+UGAlumAwards+OtherUGAct+EverAssigned+BoardMember+GradDegree+Attended09+Attended04+Attended99+NetEvents+TotalActions+NeverGiven, data=reunion_final, family="binomial")
+summary(bl_model3)
+bptest(bl_model3)
+coeftest(bl_model3, vcov = vcovHC(bl_model3, "HC1"))
+
+##Model without 'TotalActions' & 'NeverGiven' & with 'YearsLapsed'
+bl_model4 = glm(Gave2009~RYCohort+FamilyAlum+Gave2004+Gave1999+BetweenRY+ActionNote+SportsAlum+UGAlumAwards+OtherUGAct+EverAssigned+BoardMember+GradDegree+Attended09+Attended04+Attended99+YearsLapsed, data=reunion_final, family="binomial")
+summary(bl_model4)
+
+##Turn 'RYCohort' into a continous variable, 'GradSince'
+reunion_final$RYCohort_num <- as.numeric(as.character(reunion_final$RYCohort))
+reunion_final$GradSince <- 2014 - reunion_final$RYCohort_num
+
+##Model with 'GradSince'
+bl_model5 = glm(Gave2009~GradSince+FamilyAlum+Gave2004+Gave1999+BetweenRY+ActionNote+SportsAlum+UGAlumAwards+OtherUGAct+EverAssigned+BoardMember+GradDegree+Attended09+Attended04+Attended99+YearsLapsed, data=reunion_final, family="binomial")
+summary(bl_model5)
+
+##Check AIC scores of each model 
+AIC(bl_model1)
+AIC(bl_model2)
+AIC(bl_model3)
+AIC(bl_model4)
+AIC(bl_model5)
+##'bl_model5' seems to be the better model based on AIC scores 
+
+##Create training and testing datasets
+set.seed(100)
+trainingRows <- sample(1:nrow(reunion_final), 0.7 * nrow(reunion_final))
+trainingData <- reunion_final[trainingRows, ]
+testData <- reunion_final[-trainingRows, ]
+
+##Run 'bl_model5 on a training dataset
+bl_model5 = glm(Gave2009~GradSince+FamilyAlum+Gave2004+Gave1999+BetweenRY+ActionNote+SportsAlum+UGAlumAwards+OtherUGAct+EverAssigned+BoardMember+GradDegree+Attended09+Attended04+Attended99+YearsLapsed, data=trainingData, family="binomial")
+summary(bl_model5)
+
+##Based on the above model, predict probabilities on the testing data 
+predict_pb = predict(bl_model5, testData, type="response")
+thresh  <- 0.5            
+predict_bin <- cut(predict_pb, breaks=c(-Inf, thresh, Inf),labels=c("0","1"))
+
+##Confusion matrix
+table(testData$Gave2009,predict_bin)
+
+##Misclassification error
+mean(as.character(testData$Gave2009) != as.character(predict_bin))
+
+##Predict probabilities on the entire dataset
+predict_final = predict(bl_model5, reunion_final, type="response")
+thresh  <- 0.5            
+predict_bin_final <- cut(predict_final, breaks=c(-Inf, thresh, Inf),labels=c("0","1"))
+##Confusion matrix
+table(reunion_final$Gave2009,predict_bin_final)
+##Misclassification error
+mean(as.character(reunion_final$Gave2009) != as.character(predict_bin_final))
+
+##Bind predicted probabilities to the dataset
+reunion_final$PropensityScore <- predict_final
+
+##Get a numeric equivalent to WealthEngineRating  
+reunion_final$WERating = ifelse(reunion_final$WealthEngineRating=='1: $5,000,000+',12,ifelse(reunion_final$WealthEngineRating=='2: $1,000,000-$4,999,999',11,ifelse(reunion_final$WealthEngineRating=='3: $500,000-$999,999',10,ifelse(reunion_final$WealthEngineRating=='4: $250,000-$499,999',9,ifelse(reunion_final$WealthEngineRating=='5: $100,000-$249,999',8,ifelse(reunion_final$WealthEngineRating=='6: $50,000-$99,999',7,ifelse(reunion_final$WealthEngineRating=='7: $25,000-$49,999',6,ifelse(reunion_final$WealthEngineRating=='8: $15,000-$24,999',5,ifelse(reunion_final$WealthEngineRating=='9: $10,000-$14,999',4,ifelse(reunion_final$WealthEngineRating=='A: $5,000-$9,999',3,ifelse(reunion_final$WealthEngineRating=='B: $2,500-$4,999',2,ifelse(reunion_final$WealthEngineRating=='C: $1-$2,499',1,0))))))))))))
+
+```
+
+```{r}
+
+##Top 40% based on propensity scores
+n=40
+reunion_top40 <- subset(reunion_final, PropensityScore > quantile(PropensityScore, prob = 1 - n/100))
+##Top 30% based on propensity scores
+n=30
+reunion_top30 <- subset(reunion_final, PropensityScore > quantile(PropensityScore, prob = 1 - n/100))
+
+##Dataset with individuals having propensity score greater than 80%
+reunion_gt80 = subset(reunion_final,reunion_final$PropensityScore>= 0.8) 
+##Dataset with individuals having propensity score between 60% and 80%
+reunion_60to80 = subset(reunion_final,(reunion_final$PropensityScore>= 0.6) & (reunion_final$PropensityScore<0.8)) 
+##Dataset with individuals having propensity score between 40% and 60%
+reunion_40to60 = subset(reunion_final,(reunion_final$PropensityScore>= 0.4) & (reunion_final$PropensityScore<0.6)) 
+##Dataset with individuals having propensity score between 20% and 40%
+reunion_20to40 = subset(reunion_final,(reunion_final$PropensityScore>= 0.2) & (reunion_final$PropensityScore<0.4)) 
+
+##Means of numeric columns for each of the above datasets to study similarities and differences
+col_means_gt80 = data.frame(reunion_gt80[,3:3],reunion_gt80[,5:12],reunion_gt80[,14:26],reunion_gt80[,28:29],reunion_gt80[,33:33],reunion_gt80[,35:35])
+colMeans(col_means_gt80)
+col_means_gt80$Category <- "Prob. greater than 80"
+
+col_means_60to80 = data.frame(reunion_60to80[,3:3],reunion_60to80[,5:12],reunion_60to80[,14:26],reunion_60to80[,28:29],reunion_60to80[,33:33],reunion_60to80[,35:35])
+colMeans(col_means_60to80)
+col_means_60to80$Category <- "Prob. between 60 and 80"
+
+col_means_40to60 = data.frame(reunion_40to60[,3:3],reunion_40to60[,5:12],reunion_40to60[,14:26],reunion_40to60[,28:29],reunion_40to60[,33:33],reunion_40to60[,35:35])
+colMeans(col_means_40to60)
+col_means_40to60$Category <- "Prob. between 40 and 60"
+
+```
+
+```{r}
+
+##Bind the three subsets for plotting
+df_plot <- rbind.data.frame(col_means_40to60,col_means_60to80,col_means_gt80)
+
+
+##Attendance vs Propensity cat
+df1<-ddply(df_plot, .(Category), summarize, Attended99=mean(Attended99), Attended04=mean(Attended04), Attended09 = mean(Attended09))
+g1 = ggplot(df1, aes(Category,Attended99)) + geom_bar(stat = "identity", fill='brown') + labs(title = "Attendance in RY year 1999")
+g2 = ggplot(df1, aes(Category,Attended04)) + geom_bar(stat = "identity", fill='orange') + labs(title = "Attendance in RY year 2004")
+g3 = ggplot(df1, aes(Category,Attended09)) + geom_bar(stat = "identity", fill='red') + labs(title = "Attendance in RY year 2009")
+grid.arrange(g1, g2, g3, ncol=2, nrow =2)
+
+df2<-ddply(df_plot, .(Category), summarize, Gave1999=mean(Gave1999), Gave2004=mean(Gave2004), Gave2009 = mean(Gave2009))
+g4 = ggplot(df2, aes(Category,Gave1999)) + geom_bar(stat = "identity", fill='blue') + labs(title = "Gave in RY year 1999")
+g5 = ggplot(df2, aes(Category,Gave2004)) + geom_bar(stat = "identity", fill='navy') + labs(title = "Gave in RY year 2004")
+g6 = ggplot(df2, aes(Category,Gave2009)) + geom_bar(stat = "identity", fill='purple') + labs(title = "Gave in RY year 2009")
+grid.arrange(g4, g5, g6, ncol=2, nrow =2)
+
+ggplot(df_plot, aes(Category,GradSince, fill=Category)) + geom_boxplot()
+
+ggplot(df_plot, aes(Category,BoardMember)) + geom_jitter(color="blue") + labs(title = "Board members and propensity category")
+
+ggplot(df_plot, aes(y=Gave2009, x=EverAssigned, color=EverAssigned, fill=EverAssigned)) + 
+    geom_bar( stat="identity") +    
+    facet_wrap(~Category)
+
+ggplot(df_plot, aes(x=Gave2009, y=EverAssigned, color=EverAssigned, fill=EverAssigned)) + 
+    geom_bar( stat="identity") +    
+    facet_wrap(~Category)
+
+```
