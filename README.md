@@ -19,12 +19,12 @@ rms, data.table, ggplot, MASS.
 
 ![alt text][logo]
 
-[logo]: https://github.com/VNair88/Breast-Cancer-Image-Classification/blob/master/Images/Capture.JPG  "Image rendition"
+[logo]: https://github.com/VNair88/SCU_Alumni-Prediction-and-Segmention/blob/master/Plots/RYCohort_sum.JPG  "Plot1"
 
 
 ![alt text][logo1]
 
-[logo]: https://github.com/VNair88/Breast-Cancer-Image-Classification/blob/master/Images/Capture.JPG  "Image rendition"
+[logo]: https://github.com/VNair88/SCU_Alumni-Prediction-and-Segmention/blob/master/Plots/WERating_sum.JPG  "Plot2"
 
 ### Ordinal Logit model
 #### Prediction of missing wealth enginge rating values (WERating).
@@ -58,14 +58,14 @@ How the segments differ -
 
 ![alt text][logo2]
 
-[logo1]: https://github.com/VNair88/Breast-Cancer-Image-Classification/blob/master/Images/Capture2.JPG  "Confusion matrix" 
+[logo1]: https://github.com/VNair88/SCU_Alumni-Prediction-and-Segmention/blob/master/Plots/Cat_Attended.JPG  "Plot3" 
 
 ![alt text][logo3]
 
-[logo1]: https://github.com/VNair88/Breast-Cancer-Image-Classification/blob/master/Images/Capture2.JPG  "Confusion matrix"
+[logo1]: https://github.com/VNair88/SCU_Alumni-Prediction-and-Segmention/blob/master/Plots/Cat_Board.JPG  "Plot4"
 
 ![alt text][logo3]
 
-[logo1]: https://github.com/VNair88/Breast-Cancer-Image-Classification/blob/master/Images/Capture2.JPG  "Confusion matrix"
+[logo1]: https://github.com/VNair88/SCU_Alumni-Prediction-and-Segmention/blob/master/Plots/Cat_Gradsince.JPG  "Plot5"
 
 
