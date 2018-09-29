@@ -24,7 +24,7 @@ rms, data.table, ggplot, MASS.
 
 ![alt text][logo1]
 
-[logo]: https://github.com/VNair88/SCU_Alumni-Prediction-and-Segmention/blob/master/Plots/WERating_sum.JPG  "Plot2"
+[logo1]: https://github.com/VNair88/SCU_Alumni-Prediction-and-Segmention/blob/master/Plots/WERating_sum.JPG  "Plot2"
 
 ### Ordinal Logit model
 #### Prediction of missing wealth enginge rating values (WERating).
