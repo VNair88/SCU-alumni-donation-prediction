@@ -58,14 +58,14 @@ How the segments differ -
 
 ![alt text][logo2]
 
-[logo1]: https://github.com/VNair88/SCU_Alumni-Prediction-and-Segmention/blob/master/Plots/Cat_Attended.JPG  "Plot3" 
+[logo2]: https://github.com/VNair88/SCU_Alumni-Prediction-and-Segmention/blob/master/Plots/Cat_Attended.JPG  "Plot3" 
 
 ![alt text][logo3]
 
-[logo1]: https://github.com/VNair88/SCU_Alumni-Prediction-and-Segmention/blob/master/Plots/Cat_Board.JPG  "Plot4"
+[logo3]: https://github.com/VNair88/SCU_Alumni-Prediction-and-Segmention/blob/master/Plots/Cat_Board.JPG  "Plot4"
 
-![alt text][logo3]
+![alt text][logo4]
 
-[logo1]: https://github.com/VNair88/SCU_Alumni-Prediction-and-Segmention/blob/master/Plots/Cat_Gradsince.JPG  "Plot5"
+[logo4]: https://github.com/VNair88/SCU_Alumni-Prediction-and-Segmention/blob/master/Plots/Cat_Gradsince.JPG  "Plot5"
 
 
